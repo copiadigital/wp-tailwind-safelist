@@ -9,7 +9,7 @@ class ScanCommand extends Command
 {
     protected $signature = 'tailwind:scan
                             {--post-types=* : Specific post types to scan}
-                            {--skip-templates : Skip scanning Blade templates}';
+                            {--include-templates : Include scanning Blade templates (skipped by default)}';
 
     protected $description = 'Scan all content (posts, pages, CF7 forms, ACF fields, etc.) and rebuild the Tailwind safelist.';
 
@@ -28,8 +28,8 @@ class ScanCommand extends Command
         // 3. Scan widgets
         $allClasses = array_merge($allClasses, $this->scanWidgets());
 
-        // 4. Scan theme templates (Blade files)
-        if (!$this->option('skip-templates')) {
+        // 4. Scan theme templates (Blade files) - only if explicitly requested
+        if ($this->option('include-templates')) {
             $allClasses = array_merge($allClasses, $this->scanTemplates());
         }
 
