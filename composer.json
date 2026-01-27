@@ -25,6 +25,9 @@
     "issues": "https://github.com/copiadigital/wp-tailwind-safelist/issues",
     "source": "https://github.com/copiadigital/wp-tailwind-safelist"
   },
+  "bin": [
+    "bin/build-watcher.cjs"
+  ],
   "autoload": {
     "psr-4": {
       "CopiaDigital\\TailwindSafelist\\": "src/"

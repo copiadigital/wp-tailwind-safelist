@@ -4,6 +4,18 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Auto Scan on Save
+    |--------------------------------------------------------------------------
+    |
+    | When enabled, automatically scans content when posts are saved.
+    | Disabled by default - use the admin bar button or CLI command instead.
+    |
+    */
+
+    'auto_scan_on_save' => false,
+
+    /*
+    |--------------------------------------------------------------------------
     | Output Path
     |--------------------------------------------------------------------------
     |
@@ -64,5 +76,41 @@ return [
         'styles',
         'tailwind',
     ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Build Command (Development Only)
+    |--------------------------------------------------------------------------
+    |
+    | Shell command to run after updating the safelist. This is executed
+    | directly when clicking the admin bar button.
+    |
+    | For Docker environments, use the docker exec command:
+    | 'docker exec wp_base-node-1 yarn build'
+    |
+    | For local development without Docker:
+    | 'cd ' . get_stylesheet_directory() . ' && yarn build'
+    |
+    | Set to null to disable automatic builds.
+    |
+    */
+
+    'build_command' => null,
+
+    /*
+    |--------------------------------------------------------------------------
+    | Build Trigger File (Development Only)
+    |--------------------------------------------------------------------------
+    |
+    | Alternative to build_command. Path to a file that will be touched when
+    | the safelist is updated. A file watcher can monitor this to trigger builds.
+    | Only used if build_command is null.
+    |
+    | Example watcher command:
+    | while inotifywait -e modify /path/to/.tailwind-build-trigger; do yarn build; done
+    |
+    */
+
+    'build_trigger_file' => null,
 
 ];

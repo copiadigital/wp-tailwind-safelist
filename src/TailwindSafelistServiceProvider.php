@@ -18,6 +18,10 @@ class TailwindSafelistServiceProvider extends ServiceProvider
         $this->app->singleton(TailwindSafelist::class, function () {
             return new TailwindSafelist($this->app);
         });
+
+        $this->app->singleton(Scanner::class, function () {
+            return new Scanner();
+        });
     }
 
     /**
@@ -34,12 +38,26 @@ class TailwindSafelistServiceProvider extends ServiceProvider
             ScanCommand::class,
         ]);
 
-        // Only initialize on admin requests where post saving occurs
-        // This avoids ACF timing issues on the frontend
-        if (is_admin()) {
+        // Initialize admin bar and AJAX handlers (development only)
+        add_action('init', function () {
+            new Admin();
+        });
+
+        // Auto-scan on post save is disabled by default
+        // Only enable if explicitly configured AND in development environment
+        if (config('tailwind-safelist.auto_scan_on_save', false) && is_admin() && $this->isDevelopment()) {
             add_action('init', function () {
                 $this->app->make(TailwindSafelist::class);
             }, 99);
         }
+    }
+
+    /**
+     * Check if we're in development environment.
+     */
+    private function isDevelopment(): bool
+    {
+        $env = defined('WP_ENV') ? WP_ENV : (defined('WP_ENVIRONMENT_TYPE') ? WP_ENVIRONMENT_TYPE : 'production');
+        return in_array($env, ['development', 'local', 'dev']);
     }
 }

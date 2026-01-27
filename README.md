@@ -33,10 +33,28 @@ composer require copiadigital/wp-tailwind-safelist
 
 ## Setup
 
-### 1. Register the service provider so commands are available:
+### 1. Register the service provider
+
+Add the service provider to your theme's `composer.json`:
+
+```json
+{
+  "extra": {
+    "acorn": {
+      "providers": [
+        "App\\Providers\\ThemeServiceProvider",
+        "CopiaDigital\\TailwindSafelist\\TailwindSafelistServiceProvider"
+      ]
+    }
+  }
+}
+```
+
+Then run:
 
 ```bash
-wp acorn package:discover
+composer dump-autoload
+wp acorn optimize:clear
 ```
 
 ### 2. Create the database table
@@ -92,9 +110,19 @@ yarn build
 
 ## Usage
 
-### Scan all content
+### Admin Bar (Development Only)
 
-Scans all posts, pages, ACF fields, CF7 forms, widgets, and Blade templates:
+In development environments (`WP_ENV=development`), a **"Re-process Tailwind"** button appears in the WordPress admin bar. Click it to:
+
+1. Scan all content for CSS classes
+2. Update the safelist file
+3. Optionally trigger a build (if configured)
+
+This provides a quick way to update the safelist without using the command line.
+
+### Scan all content (CLI)
+
+Scans all posts, pages, ACF fields, CF7 forms, and widgets (templates are skipped by default):
 
 ```bash
 wp acorn tailwind:scan
@@ -106,10 +134,12 @@ wp acorn tailwind:scan
 wp acorn tailwind:scan --post-types=post --post-types=page
 ```
 
-### Skip template scanning
+### Include Blade template scanning
+
+To also scan Blade templates for classes:
 
 ```bash
-wp acorn tailwind:scan --skip-templates
+wp acorn tailwind:scan --include-templates
 ```
 
 ## How it works
@@ -124,7 +154,7 @@ When you save a post, page, or CF7 form in the WordPress admin, the plugin autom
 
 ### Manual scanning
 
-The `tailwind:scan` command provides a comprehensive scan of:
+The `tailwind:scan` command scans the following by default:
 
 - **All post types** - Posts, pages, custom post types
 - **Contact Form 7** - Form templates and mail templates
@@ -136,6 +166,8 @@ The `tailwind:scan` command provides a comprehensive scan of:
   - Fields with class-related names (automatically detected)
 - **ACF Options Pages** - All registered options pages
 - **Widgets** - All widget settings
+
+With `--include-templates` option:
 - **Blade Templates** - All `.blade.php` files in `resources/views`
 
 ## Configuration
@@ -152,6 +184,10 @@ wp acorn vendor:publish --provider="CopiaDigital\TailwindSafelist\TailwindSafeli
 // config/tailwind-safelist.php
 
 return [
+    // Auto-scan on post save (disabled by default)
+    // Set to true to automatically scan when posts are saved
+    'auto_scan_on_save' => false,
+
     // Output file path
     'output_path' => get_stylesheet_directory() . '/tailwind-safelist.txt',
 
@@ -170,7 +206,25 @@ return [
         'tailwind',
         // Add your own patterns...
     ],
+
+    // Build trigger file for auto-build (development only)
+    'build_trigger_file' => get_stylesheet_directory() . '/.tailwind-build-trigger',
 ];
+```
+
+### Auto-build with file watcher
+
+To automatically run `yarn build` when the safelist is updated via the admin bar:
+
+1. Set `build_trigger_file` in your config
+2. Run a file watcher in your node container:
+
+```bash
+# Using inotifywait
+while inotifywait -e modify /app/.tailwind-build-trigger; do yarn build; done
+
+# Or using nodemon
+npx nodemon --watch .tailwind-build-trigger --exec "yarn build"
 ```
 
 ## License
