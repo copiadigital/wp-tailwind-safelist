@@ -1,0 +1,26 @@
+{
+  "name": "copiadigital/wp-tailwind-safelist",
+  "type": "package",
+  "license": "MIT",
+  "homepage": "https://github.com/copiadigital/wp-tailwind-safelist",
+  "authors": [
+    {
+      "name": "Copia Digital Dev Team",
+      "email": "info@copiadigital.com",
+      "homepage": "https://github.com/copiadigital"
+    }
+  ],
+  "keywords": [
+    "wordpress",
+    "tailwindcss",
+    "sage"
+  ],
+  "autoload": {
+    "psr-4": {
+      "TailwindSafelist\\": "src/"
+    }
+  },
+  "require": {
+    "php": "^8.2"
+  }
+}
