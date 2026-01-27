@@ -1,26 +1,44 @@
 {
   "name": "copiadigital/wp-tailwind-safelist",
   "type": "package",
+  "description": "Automatically creates a Tailwind CSS safelist from WordPress content including Gutenberg blocks, ACF fields, Contact Form 7, and more.",
   "license": "MIT",
-  "homepage": "https://github.com/copiadigital/wp-tailwind-safelist",
   "authors": [
     {
-      "name": "Copia Digital Dev Team",
-      "email": "info@copiadigital.com",
-      "homepage": "https://github.com/copiadigital"
+      "name": "Copia Digital",
+      "email": "dev@copiadigital.com",
+      "homepage": "https://www.copiadigital.com"
     }
   ],
   "keywords": [
     "wordpress",
+    "tailwind",
     "tailwindcss",
-    "sage"
+    "safelist",
+    "gutenberg",
+    "acf",
+    "sage",
+    "acorn"
   ],
+  "homepage": "https://github.com/copiadigital/wp-tailwind-safelist",
+  "support": {
+    "issues": "https://github.com/copiadigital/wp-tailwind-safelist/issues",
+    "source": "https://github.com/copiadigital/wp-tailwind-safelist"
+  },
   "autoload": {
     "psr-4": {
-      "TailwindSafelist\\": "src/"
+      "CopiaDigital\\TailwindSafelist\\": "src/"
     }
   },
   "require": {
-    "php": "^8.2"
+    "php": "^8.1",
+    "illuminate/support": "^10.0 || ^11.0 || ^12.0"
+  },
+  "extra": {
+    "acorn": {
+      "providers": [
+        "CopiaDigital\\TailwindSafelist\\TailwindSafelistServiceProvider"
+      ]
+    }
   }
 }
