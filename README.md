@@ -33,13 +33,19 @@ composer require copiadigital/wp-tailwind-safelist
 
 ## Setup
 
-### 1. Create the database table
+### 1. Register the service provider so commands are available:
+
+```bash
+wp acorn package:discover
+```
+
+### 2. Create the database table
 
 ```bash
 wp acorn tailwind:update-db
 ```
 
-### 2. Configure your Tailwind config
+### 3. Configure your Tailwind config
 
 Add the following to your `tailwind.config.js`:
 
@@ -72,13 +78,13 @@ export default {
 }
 ```
 
-### 3. Run the initial scan
+### 4. Run the initial scan
 
 ```bash
 wp acorn tailwind:scan
 ```
 
-### 4. Rebuild your assets
+### 5. Rebuild your assets
 
 ```bash
 yarn build
