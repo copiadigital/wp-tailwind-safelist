@@ -86,9 +86,10 @@ class Admin
      */
     private function triggerBuild(): void
     {
+        $vendorDir = dirname(__DIR__);
         $themeDir = get_stylesheet_directory();
 
-        // Write to trigger file for build-watcher.sh
+        // Write to trigger file for build-watcher.cjs
         $triggerFile = $themeDir . '/.tailwind-build-trigger';
         file_put_contents($triggerFile, time());
 

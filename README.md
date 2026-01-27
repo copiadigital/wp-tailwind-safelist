@@ -9,6 +9,7 @@ Built for [Sage](https://roots.io/sage) themes using [Acorn](https://roots.io/ac
 - PHP >= 8.1
 - [Acorn](https://roots.io/acorn) >= 4.0
 - [Sage](https://roots.io/sage) >= 10.0
+- Node.js (for the build watcher)
 
 ## Installation
 
@@ -120,7 +121,9 @@ In development environments (`WP_ENV=development`), a **"Re-process Tailwind"** 
 
 This provides a quick way to update the safelist without using the command line.
 
-### Scan all content (CLI)
+### CLI Commands
+
+#### Scan all content
 
 Scans all posts, pages, ACF fields, CF7 forms, and widgets (templates are skipped by default):
 
@@ -128,13 +131,21 @@ Scans all posts, pages, ACF fields, CF7 forms, and widgets (templates are skippe
 wp acorn tailwind:scan
 ```
 
-### Scan specific post types
+#### Watch for changes
+
+Start the build watcher to automatically trigger `yarn build` when the safelist is updated:
+
+```bash
+wp acorn tailwind:watch
+```
+
+#### Scan specific post types
 
 ```bash
 wp acorn tailwind:scan --post-types=post --post-types=page
 ```
 
-### Include Blade template scanning
+#### Include Blade template scanning
 
 To also scan Blade templates for classes:
 
@@ -217,15 +228,13 @@ return [
 To automatically run `yarn build` when the safelist is updated via the admin bar:
 
 1. Set `build_trigger_file` in your config
-2. Run a file watcher in your node container:
+2. Run the build watcher:
 
 ```bash
-# Using inotifywait
-while inotifywait -e modify /app/.tailwind-build-trigger; do yarn build; done
-
-# Or using nodemon
-npx nodemon --watch .tailwind-build-trigger --exec "yarn build"
+wp acorn tailwind:watch
 ```
+
+This will watch for safelist changes and automatically trigger `yarn build` when updates occur.
 
 ## License
 

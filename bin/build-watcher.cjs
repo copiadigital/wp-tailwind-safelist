@@ -1,60 +1,52 @@
 #!/usr/bin/env node
 
 /**
- * Build watcher for wp-tailwind-safelist
- * Watches for trigger file changes and runs yarn build
+ * Reliable Build Watcher for wp-tailwind-safelist
+ * Watches the trigger file and runs `yarn build` when it changes
  */
 
 const fs = require('fs');
 const { spawn } = require('child_process');
 const path = require('path');
 
-const TRIGGER_FILE = path.join(__dirname, '.tailwind-build-trigger');
-let isBuilding = false;
-let lastModified = 0;
+// Path to the trigger file (relative to this file)
+const TRIGGER_FILE = path.join(__dirname, '../../../../.tailwind-build-trigger');
+const THEME_DIR = path.resolve(TRIGGER_FILE, '..'); // For yarn build
 
-// Create trigger file if it doesn't exist
+let isBuilding = false;
+
+// Ensure trigger file exists
 if (!fs.existsSync(TRIGGER_FILE)) {
     fs.writeFileSync(TRIGGER_FILE, '0');
 }
 
-console.log('Build watcher started');
+console.log('Tailwind Build Watcher started');
 console.log(`Watching: ${TRIGGER_FILE}`);
 console.log('Press Ctrl+C to stop\n');
 
-// Watch for file changes
-fs.watch(TRIGGER_FILE, (eventType) => {
-    if (eventType !== 'change' || isBuilding) return;
-
-    // Debounce - check if file was actually modified
-    try {
-        const stats = fs.statSync(TRIGGER_FILE);
-        const currentModified = stats.mtimeMs;
-
-        if (currentModified === lastModified) return;
-        lastModified = currentModified;
-    } catch (e) {
-        return;
-    }
+/**
+ * Build runner
+ */
+function runBuild() {
+    if (isBuilding) return;
+    isBuilding = true;
 
     console.log('\n==========================================');
     console.log(`Build triggered at ${new Date().toLocaleString()}`);
     console.log('==========================================\n');
 
-    isBuilding = true;
-
     const build = spawn('yarn', ['build'], {
-        cwd: __dirname,
+        cwd: THEME_DIR,
         stdio: 'inherit',
-        shell: true
+        shell: true,
     });
 
     build.on('close', (code) => {
         isBuilding = false;
         if (code === 0) {
-            console.log('\nBuild complete!\n');
+            console.log('\n✅ Build complete!\n');
         } else {
-            console.log(`\nBuild failed with code ${code}\n`);
+            console.log(`\n❌ Build failed with code ${code}\n`);
         }
     });
 
@@ -62,6 +54,16 @@ fs.watch(TRIGGER_FILE, (eventType) => {
         isBuilding = false;
         console.error('Build error:', err.message);
     });
+}
+
+/**
+ * Watch trigger file using fs.watchFile (polling)
+ * This is much more reliable than fs.watch
+ */
+fs.watchFile(TRIGGER_FILE, { interval: 200 }, (curr, prev) => {
+    if (curr.mtimeMs !== prev.mtimeMs) {
+        runBuild();
+    }
 });
 
 // Keep process alive
