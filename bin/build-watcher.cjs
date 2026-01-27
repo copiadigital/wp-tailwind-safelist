@@ -3,17 +3,29 @@
 /**
  * Reliable Build Watcher for wp-tailwind-safelist
  * Watches the trigger file and runs `yarn build` when it changes
+ *
+ * Usage:
+ *   node ./vendor/copiadigital/wp-tailwind-safelist/bin/build-watcher.cjs
+ *
+ * Run this from your theme directory where package.json is located.
  */
 
 const fs = require('fs');
 const { spawn } = require('child_process');
 const path = require('path');
 
-// Path to the trigger file (relative to this file)
-const TRIGGER_FILE = path.join(__dirname, '../../../../.tailwind-build-trigger');
-const THEME_DIR = path.resolve(TRIGGER_FILE, '..'); // For yarn build
+// Theme directory is the current working directory
+const THEME_DIR = process.cwd();
+const TRIGGER_FILE = path.join(THEME_DIR, '.tailwind-build-trigger');
 
 let isBuilding = false;
+
+// Verify we're in a theme directory
+if (!fs.existsSync(path.join(THEME_DIR, 'package.json'))) {
+    console.error('Error: No package.json found in current directory.');
+    console.error('Please run this command from your theme directory.');
+    process.exit(1);
+}
 
 // Ensure trigger file exists
 if (!fs.existsSync(TRIGGER_FILE)) {
@@ -21,6 +33,7 @@ if (!fs.existsSync(TRIGGER_FILE)) {
 }
 
 console.log('Tailwind Build Watcher started');
+console.log(`Theme directory: ${THEME_DIR}`);
 console.log(`Watching: ${TRIGGER_FILE}`);
 console.log('Press Ctrl+C to stop\n');
 

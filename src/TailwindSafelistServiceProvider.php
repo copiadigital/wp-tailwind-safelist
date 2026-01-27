@@ -4,7 +4,6 @@ namespace CopiaDigital\TailwindSafelist;
 
 use CopiaDigital\TailwindSafelist\Commands\ScanCommand;
 use CopiaDigital\TailwindSafelist\Commands\UpdateDbCommand;
-use CopiaDigital\TailwindSafelist\Commands\WatchCommand;
 use Illuminate\Support\ServiceProvider;
 
 class TailwindSafelistServiceProvider extends ServiceProvider
@@ -37,7 +36,6 @@ class TailwindSafelistServiceProvider extends ServiceProvider
         $this->commands([
             UpdateDbCommand::class,
             ScanCommand::class,
-            WatchCommand::class,
         ]);
 
         // Initialize admin bar and AJAX handlers (development only)
