@@ -40,7 +40,7 @@ class TailwindSafelistServiceProvider extends ServiceProvider
             ScanCommand::class,
         ]);
 
-        // Initialize admin bar and AJAX handlers (development only)
+        // Initialize admin bar and AJAX handlers (administrators only)
         add_action('init', function () {
             new Admin();
         });

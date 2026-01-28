@@ -6,10 +6,23 @@ Built for [Sage](https://roots.io/sage) themes using [Acorn](https://roots.io/ac
 
 ## Requirements
 
-- PHP >= 8.1
+- PHP >= 8.1 with `exec()` enabled
 - [Acorn](https://roots.io/acorn) >= 4.0
 - [Sage](https://roots.io/sage) >= 10.0
-- Node.js (optional, for the build watcher)
+
+**Note:** Node.js is NOT required on the server. This package includes standalone yarn binaries.
+
+## Bundled Binaries
+
+This package is fully self-contained with bundled executables:
+
+| File | Purpose |
+|------|---------|
+| `yarn-linux` | Standalone yarn for Linux servers |
+| `yarn-macos` | Standalone yarn for macOS |
+| `wp-cli.phar` | WP-CLI for triggering builds |
+
+No external dependencies needed - works on any server with PHP.
 
 ## Installation
 
@@ -111,50 +124,47 @@ yarn build
 
 ## Usage
 
-### Admin Bar (Development Only)
+### Admin Bar Button
 
-In development environments (`WP_ENV=development`), a **"Re-process Tailwind"** button appears in the WordPress admin bar. Click it to:
+A **"Re-process Tailwind"** button appears in the WordPress admin bar for administrators. Click it to:
 
 1. Scan all content for CSS classes
 2. Update the safelist file
-3. Optionally trigger a build (if configured)
+3. Automatically trigger `yarn build` via WP-CLI
 
-This provides a quick way to update the safelist without using the command line.
+**Security:**
+- Only visible to users with `manage_options` capability (Administrators)
+- Protected by WordPress nonce verification
+- Works in all environments (development, staging, production)
 
 ### CLI Commands
 
-#### Scan all content
+#### Scan and build
 
-Scans all posts, pages, ACF fields, CF7 forms, and widgets (templates are skipped by default):
+Scans all content and triggers a build:
 
 ```bash
 wp acorn tailwind:scan
 ```
 
-#### Watch for changes
-
-Start the build watcher to automatically trigger `yarn build` when the safelist is updated.
-
-Run from your theme directory:
+#### Scan only (no build)
 
 ```bash
-node ./vendor/copiadigital/wp-tailwind-safelist/bin/build-watcher.cjs
+wp acorn tailwind:scan --no-build
 ```
 
-Or add it to your `package.json` scripts:
+#### Build only
 
-```json
-{
-  "scripts": {
-    "watch:safelist": "node ./vendor/copiadigital/wp-tailwind-safelist/bin/build-watcher.cjs"
-  }
-}
-```
-
-Then run:
+Run the yarn build using the standalone binary:
 
 ```bash
-yarn watch:safelist
+wp acorn tailwind:build
+```
+
+#### Development build
+
+```bash
+wp acorn tailwind:build --dev
 ```
 
 #### Scan specific post types
@@ -165,25 +175,43 @@ wp acorn tailwind:scan --post-types=post --post-types=page
 
 #### Include Blade template scanning
 
-To also scan Blade templates for classes:
-
 ```bash
 wp acorn tailwind:scan --include-templates
 ```
 
-## How it works
+#### Update database table
 
-### Automatic detection on save
+```bash
+wp acorn tailwind:update-db
+```
 
-When you save a post, page, or CF7 form in the WordPress admin, the plugin automatically:
+## How It Works
 
-1. Extracts all CSS classes from the content
-2. Stores them in the database
-3. Updates the `tailwind-safelist.txt` file
+### When you click "Re-process Tailwind"
 
-### Manual scanning
+```
+Click button
+    |
+    v
+PHP scans all content for CSS classes
+    |
+    v
+Saves classes to database and tailwind-safelist.txt
+    |
+    v
+Calls: php wp-cli.phar acorn tailwind:build --allow-root
+    |
+    v
+BuildCommand detects OS (Linux/macOS)
+    |
+    v
+Executes: ./yarn-linux build (or ./yarn-macos)
+    |
+    v
+Tailwind CSS rebuilt with new classes
+```
 
-The `tailwind:scan` command scans the following by default:
+### Content sources scanned
 
 - **All post types** - Posts, pages, custom post types
 - **Contact Form 7** - Form templates and mail templates
@@ -213,10 +241,6 @@ wp acorn vendor:publish --provider="CopiaDigital\TailwindSafelist\TailwindSafeli
 // config/tailwind-safelist.php
 
 return [
-    // Auto-scan on post save (disabled by default)
-    // Set to true to automatically scan when posts are saved
-    'auto_scan_on_save' => false,
-
     // Output file path
     'output_path' => get_stylesheet_directory() . '/tailwind-safelist.txt',
 
@@ -236,33 +260,31 @@ return [
         // Add your own patterns...
     ],
 
-    // Build trigger file for auto-build (development only)
-    'build_trigger_file' => get_stylesheet_directory() . '/.tailwind-build-trigger',
+    // Custom build command (optional)
+    // If not set, uses bundled wp-cli.phar and yarn binaries
+    'build_command' => null,
 ];
 ```
 
-### Auto-build with file watcher
+## Server Requirements
 
-To automatically run `yarn build` when the safelist is updated via the admin bar:
+| Environment | Requirements |
+|-------------|--------------|
+| **Any server** | PHP 8.1+ with `exec()` enabled |
+| **Docker** | Works automatically |
+| **Staging/Production** | No Node.js needed (standalone binaries) |
 
-1. Set `build_trigger_file` in your config
-2. Run the build watcher from your theme directory:
+## Security
 
-```bash
-node ./vendor/copiadigital/wp-tailwind-safelist/bin/build-watcher.cjs
-```
+The admin bar button and AJAX endpoint are protected by:
 
-This will watch for safelist changes and automatically trigger `yarn build` when updates occur.
+1. **Capability check**: `current_user_can('manage_options')` - Administrators only
+2. **Nonce verification**: `check_ajax_referer()` - CSRF protection
+3. **Input sanitization**: All shell arguments use `escapeshellarg()`
 
-**Tip:** Add a script to your `package.json` for convenience:
+## Changelog
 
-```json
-{
-  "scripts": {
-    "watch:safelist": "node ./vendor/copiadigital/wp-tailwind-safelist/bin/build-watcher.cjs"
-  }
-}
-```
+See [CHANGELOG.md](CHANGELOG.md) for version history and updates.
 
 ## License
 

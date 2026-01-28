@@ -6,27 +6,14 @@ class Admin
 {
     /**
      * Initialize admin functionality.
+     * Available in all environments, restricted to administrators only.
      */
     public function __construct()
     {
-        // Only in development environment
-        if (!$this->isDevelopment()) {
-            return;
-        }
-
         add_action('admin_bar_menu', [$this, 'addAdminBarItem'], 100);
         add_action('wp_ajax_tailwind_safelist_scan', [$this, 'handleAjaxScan']);
         add_action('admin_footer', [$this, 'addAdminScript']);
         add_action('wp_footer', [$this, 'addAdminScript']);
-    }
-
-    /**
-     * Check if we're in development environment.
-     */
-    private function isDevelopment(): bool
-    {
-        $env = defined('WP_ENV') ? WP_ENV : (defined('WP_ENVIRONMENT_TYPE') ? WP_ENVIRONMENT_TYPE : 'production');
-        return in_array($env, ['development', 'local', 'dev']);
     }
 
     /**
