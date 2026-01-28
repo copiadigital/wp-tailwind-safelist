@@ -117,10 +117,11 @@ class Admin
         $themeDir = get_stylesheet_directory();
 
         // Build the WP-CLI command
+        // Note: $wpCliPath is already shell-escaped by getWpCliPath()
         $command = sprintf(
             'cd %s && %s acorn tailwind:build --allow-root 2>&1',
             escapeshellarg($themeDir),
-            escapeshellarg($wpCliPath)
+            $wpCliPath
         );
 
         $this->runCommand($command);
@@ -130,7 +131,10 @@ class Admin
      * Get the path to WP-CLI executable.
      * Uses wp-cli.phar bundled with this package.
      *
-     * @return string|null Path to wp-cli or null if not found
+     * Returns a shell-safe command string that can be used directly in shell commands.
+     * The path component is properly escaped with escapeshellarg().
+     *
+     * @return string|null Shell-safe WP-CLI command or null if not found
      */
     private function getWpCliPath(): ?string
     {
@@ -139,13 +143,14 @@ class Admin
         $wpCliPhar = $packageDir . '/wp-cli.phar';
 
         if (file_exists($wpCliPhar)) {
-            return 'php ' . $wpCliPhar;
+            // Return with php command and properly escaped phar path
+            return 'php ' . escapeshellarg($wpCliPhar);
         }
 
         // Fallback to wp command in PATH
         $check = shell_exec('which wp 2>/dev/null');
         if (!empty(trim($check ?? ''))) {
-            return trim($check);
+            return escapeshellarg(trim($check));
         }
 
         return null;
