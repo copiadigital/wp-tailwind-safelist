@@ -39,6 +39,10 @@ class BuildCommand extends Command
         $buildCommand = $this->option('dev') ? 'dev' : 'build';
         $this->info(sprintf('Running yarn %s in %s...', $buildCommand, $themeDir));
 
+        // Fix permissions before build to avoid EACCES errors
+        $buildDir = $themeDir . '/public/build';
+        $this->fixBuildPermissions($buildDir);
+
         // Execute yarn build
         $command = sprintf(
             'cd %s && %s %s 2>&1',
@@ -56,8 +60,30 @@ class BuildCommand extends Command
             return self::FAILURE;
         }
 
+        // Fix permissions after build so subsequent builds can overwrite
+        $this->fixBuildPermissions($buildDir);
+
         $this->info(sprintf('Yarn %s completed successfully!', $buildCommand));
         return self::SUCCESS;
+    }
+
+    /**
+     * Fix permissions on the build directory to avoid EACCES errors.
+     *
+     * When builds run from different contexts (PHP container, node container, host),
+     * files may be owned by different users. This makes the build directory
+     * world-writable since it only contains compiled assets (not sensitive data).
+     */
+    private function fixBuildPermissions(string $buildDir): void
+    {
+        if (!is_dir($buildDir)) {
+            return;
+        }
+
+        // Make build directory and all contents world-writable
+        // This is safe because public/build only contains compiled CSS/JS assets
+        $command = sprintf('chmod -R a+w %s 2>/dev/null', escapeshellarg($buildDir));
+        @exec($command);
     }
 
     /**

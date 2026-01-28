@@ -274,6 +274,21 @@ return [
 | **Docker** | Works automatically |
 | **Staging/Production** | No Node.js needed (standalone binaries) |
 
+## Cross-Platform Compatibility
+
+The build process automatically handles file permissions across different environments:
+
+| Server Type | Web User | Supported |
+|-------------|----------|-----------|
+| Debian/Ubuntu | `www-data` | ✅ |
+| RHEL/CentOS | `apache` | ✅ |
+| Amazon Linux | `ec2-user` | ✅ |
+| Nginx | `nginx` | ✅ |
+| macOS | `_www` | ✅ |
+| Docker | `root` | ✅ |
+
+The package automatically sets appropriate file permissions on the `public/build` directory to prevent `EACCES` permission errors when builds run from different contexts (PHP container, node container, host machine).
+
 ## Security
 
 The admin bar button and AJAX endpoint are protected by:

@@ -140,3 +140,63 @@ After making changes:
 | Docker | WP-CLI runs inside PHP container, executes yarn-linux |
 | Local (macOS) | Directly executes yarn-macos |
 | Staging/Production | No Node.js needed - uses bundled yarn-linux |
+
+## Permission Handling
+
+The build process automatically fixes file permissions to prevent `EACCES` errors when builds run from different contexts (PHP container, node container, host machine).
+
+### How it works
+
+Both `Admin.php` and `BuildCommand.php` include a `fixBuildPermissions()` method that:
+
+1. Runs **before** the yarn build to ensure existing files can be deleted/overwritten
+2. Runs **after** the yarn build to ensure new files can be modified by subsequent builds
+
+```php
+private function fixBuildPermissions(string $buildDir): void
+{
+    if (!is_dir($buildDir)) {
+        return;
+    }
+
+    // Make build directory and all contents world-writable
+    // This is safe because public/build only contains compiled CSS/JS assets
+    $command = sprintf('chmod -R a+w %s 2>/dev/null', escapeshellarg($buildDir));
+    @exec($command);
+}
+```
+
+### Why world-writable is safe here
+
+The `public/build` directory only contains:
+- Compiled CSS files
+- Compiled JS files
+- Source maps
+- Build manifest
+
+These are all generated assets with no sensitive data, so world-writable permissions are acceptable.
+
+## Known Issues & Fixes
+
+### WP-CLI Path Escaping (Fixed in v1.1.0)
+
+**Issue:** When `getWpCliPath()` returned `php /path/to/wp-cli.phar`, the entire string was wrapped in `escapeshellarg()`, causing the shell to look for a command literally named `"php /path/to/wp-cli.phar"`.
+
+**Fix:** The phar path is now escaped separately:
+```php
+// Before (broken):
+return 'php ' . $wpCliPhar;
+// ... then later:
+escapeshellarg($wpCliPath) // Wraps entire string = broken
+
+// After (fixed):
+return 'php ' . escapeshellarg($wpCliPhar);
+// ... then later:
+$wpCliPath // Already properly escaped
+```
+
+### Permission Errors in Docker (Fixed in v1.1.0)
+
+**Issue:** When the PHP container ran `yarn build`, files were created as `root`. Subsequent builds from different users/containers failed with `EACCES: permission denied`.
+
+**Fix:** Added `fixBuildPermissions()` that runs `chmod -R a+w` on the build directory before and after builds.

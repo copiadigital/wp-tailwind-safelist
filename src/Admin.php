@@ -115,6 +115,11 @@ class Admin
         }
 
         $themeDir = get_stylesheet_directory();
+        $buildDir = $themeDir . '/public/build';
+
+        // Fix permissions before build to avoid EACCES errors
+        // This handles cases where files were created by different users (root vs www-data)
+        $this->fixBuildPermissions($buildDir);
 
         // Build the WP-CLI command
         // Note: $wpCliPath is already shell-escaped by getWpCliPath()
@@ -125,6 +130,28 @@ class Admin
         );
 
         $this->runCommand($command);
+
+        // Fix permissions after build so subsequent builds can overwrite
+        $this->fixBuildPermissions($buildDir);
+    }
+
+    /**
+     * Fix permissions on the build directory to avoid EACCES errors.
+     *
+     * When builds run from different contexts (PHP container, node container, host),
+     * files may be owned by different users. This makes the build directory
+     * world-writable since it only contains compiled assets (not sensitive data).
+     */
+    private function fixBuildPermissions(string $buildDir): void
+    {
+        if (!is_dir($buildDir)) {
+            return;
+        }
+
+        // Make build directory and all contents world-writable
+        // This is safe because public/build only contains compiled CSS/JS assets
+        $command = sprintf('chmod -R a+w %s 2>/dev/null', escapeshellarg($buildDir));
+        @exec($command);
     }
 
     /**
