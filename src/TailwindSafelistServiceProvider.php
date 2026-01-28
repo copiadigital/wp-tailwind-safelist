@@ -2,6 +2,7 @@
 
 namespace CopiaDigital\TailwindSafelist;
 
+use CopiaDigital\TailwindSafelist\Commands\BuildCommand;
 use CopiaDigital\TailwindSafelist\Commands\ScanCommand;
 use CopiaDigital\TailwindSafelist\Commands\UpdateDbCommand;
 use Illuminate\Support\ServiceProvider;
@@ -34,6 +35,7 @@ class TailwindSafelistServiceProvider extends ServiceProvider
         ], 'tailwind-safelist-config');
 
         $this->commands([
+            BuildCommand::class,
             UpdateDbCommand::class,
             ScanCommand::class,
         ]);

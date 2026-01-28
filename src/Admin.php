@@ -98,6 +98,138 @@ class Admin
         if (file_exists($tailwindConfig)) {
             touch($tailwindConfig);
         }
+
+        // Try to execute build command if configured
+        $this->executeYarnBuild();
+    }
+
+    /**
+     * Execute yarn build.
+     *
+     * Priority:
+     * 1. Use configured build_command if set
+     * 2. If not in Docker, run standalone yarn binary directly
+     * 3. If in Docker, rely on trigger file + build-watcher
+     */
+    private function executeYarnBuild(): void
+    {
+        // 1. Check for configured build command first
+        $buildCommand = config('tailwind-safelist.build_command');
+
+        if (!empty($buildCommand)) {
+            $this->runCommand($buildCommand);
+            return;
+        }
+
+        // 2. If not in Docker, try to run standalone yarn binary directly
+        if (!$this->isRunningInDocker()) {
+            $this->runStandaloneYarnBuild();
+            return;
+        }
+
+        // 3. In Docker without build_command - rely on trigger file + watcher
+        // The trigger file was already written in triggerBuild()
+    }
+
+    /**
+     * Check if running inside a Docker container.
+     */
+    private function isRunningInDocker(): bool
+    {
+        // Check for .dockerenv file (most reliable)
+        if (file_exists('/.dockerenv')) {
+            return true;
+        }
+
+        // Check cgroup for docker/container references
+        if (file_exists('/proc/1/cgroup')) {
+            $cgroup = @file_get_contents('/proc/1/cgroup');
+            if ($cgroup && (str_contains($cgroup, 'docker') || str_contains($cgroup, '/lxc/'))) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Detect the operating system.
+     *
+     * @return string 'linux', 'macos', or 'unknown'
+     */
+    private function detectOS(): string
+    {
+        $os = strtolower(PHP_OS_FAMILY);
+
+        if ($os === 'darwin') {
+            return 'macos';
+        }
+
+        if ($os === 'linux') {
+            return 'linux';
+        }
+
+        // Fallback check using PHP_OS for older PHP versions
+        $phpOs = strtolower(PHP_OS);
+        if (str_contains($phpOs, 'darwin')) {
+            return 'macos';
+        }
+        if (str_contains($phpOs, 'linux') || str_contains($phpOs, 'ubuntu')) {
+            return 'linux';
+        }
+
+        return 'unknown';
+    }
+
+    /**
+     * Run the standalone yarn binary to execute build.
+     */
+    private function runStandaloneYarnBuild(): void
+    {
+        $os = $this->detectOS();
+
+        if ($os === 'unknown') {
+            error_log('Tailwind Safelist: Unable to detect OS for yarn build');
+            return;
+        }
+
+        $vendorDir = dirname(__DIR__);
+        $themeDir = get_stylesheet_directory();
+        $yarnBinary = $vendorDir . '/yarn-' . $os;
+
+        if (!file_exists($yarnBinary)) {
+            error_log('Tailwind Safelist: Yarn binary not found at ' . $yarnBinary);
+            return;
+        }
+
+        // Make executable if needed
+        if (!is_executable($yarnBinary)) {
+            @chmod($yarnBinary, 0755);
+        }
+
+        $command = sprintf(
+            'cd %s && %s build 2>&1',
+            escapeshellarg($themeDir),
+            escapeshellarg($yarnBinary)
+        );
+
+        $this->runCommand($command);
+    }
+
+    /**
+     * Run a shell command and log the result.
+     */
+    private function runCommand(string $command): void
+    {
+        $output = [];
+        $returnCode = 0;
+        exec($command, $output, $returnCode);
+
+        if ($returnCode !== 0) {
+            error_log('Tailwind Safelist: Build failed with code ' . $returnCode . ': ' . implode("\n", $output));
+        } else {
+            error_log('Tailwind Safelist: Build completed successfully');
+        }
     }
 
     /**

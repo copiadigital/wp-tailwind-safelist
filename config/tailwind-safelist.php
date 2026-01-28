@@ -113,4 +113,21 @@ return [
 
     'build_trigger_file' => null,
 
+    /*
+    |--------------------------------------------------------------------------
+    | Node Container Name (Docker Development)
+    |--------------------------------------------------------------------------
+    |
+    | The Docker container name running Node.js. Used for auto-detection
+    | of the build environment when build_command is not set.
+    |
+    | If not set, will auto-detect by looking for containers with names
+    | ending in "-node-1" (docker compose naming convention).
+    |
+    | Example: 'wp_mysite-node-1'
+    |
+    */
+
+    'node_container' => null,
+
 ];
