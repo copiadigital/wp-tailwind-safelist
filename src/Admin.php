@@ -89,7 +89,7 @@ class Admin
         $vendorDir = dirname(__DIR__);
         $themeDir = get_stylesheet_directory();
 
-        // Write to trigger file for build-watcher.cjs
+        // Write to trigger file (for external watchers if needed)
         $triggerFile = $themeDir . '/.tailwind-build-trigger';
         file_put_contents($triggerFile, time());
 
@@ -104,16 +104,14 @@ class Admin
     }
 
     /**
-     * Execute yarn build.
+     * Execute yarn build via WP-CLI.
      *
-     * Priority:
-     * 1. Use configured build_command if set
-     * 2. If not in Docker, run standalone yarn binary directly
-     * 3. If in Docker, rely on trigger file + build-watcher
+     * Uses `wp acorn tailwind:build` which handles OS detection
+     * and runs the appropriate standalone yarn binary.
      */
     private function executeYarnBuild(): void
     {
-        // 1. Check for configured build command first
+        // Check for custom build command first
         $buildCommand = config('tailwind-safelist.build_command');
 
         if (!empty($buildCommand)) {
@@ -121,99 +119,49 @@ class Admin
             return;
         }
 
-        // 2. If not in Docker, try to run standalone yarn binary directly
-        if (!$this->isRunningInDocker()) {
-            $this->runStandaloneYarnBuild();
+        // Use WP-CLI to run the build command
+        $wpCliPath = $this->getWpCliPath();
+
+        if (!$wpCliPath) {
+            error_log('Tailwind Safelist: WP-CLI not found, relying on trigger file');
             return;
         }
 
-        // 3. In Docker without build_command - rely on trigger file + watcher
-        // The trigger file was already written in triggerBuild()
-    }
-
-    /**
-     * Check if running inside a Docker container.
-     */
-    private function isRunningInDocker(): bool
-    {
-        // Check for .dockerenv file (most reliable)
-        if (file_exists('/.dockerenv')) {
-            return true;
-        }
-
-        // Check cgroup for docker/container references
-        if (file_exists('/proc/1/cgroup')) {
-            $cgroup = @file_get_contents('/proc/1/cgroup');
-            if ($cgroup && (str_contains($cgroup, 'docker') || str_contains($cgroup, '/lxc/'))) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    /**
-     * Detect the operating system.
-     *
-     * @return string 'linux', 'macos', or 'unknown'
-     */
-    private function detectOS(): string
-    {
-        $os = strtolower(PHP_OS_FAMILY);
-
-        if ($os === 'darwin') {
-            return 'macos';
-        }
-
-        if ($os === 'linux') {
-            return 'linux';
-        }
-
-        // Fallback check using PHP_OS for older PHP versions
-        $phpOs = strtolower(PHP_OS);
-        if (str_contains($phpOs, 'darwin')) {
-            return 'macos';
-        }
-        if (str_contains($phpOs, 'linux') || str_contains($phpOs, 'ubuntu')) {
-            return 'linux';
-        }
-
-        return 'unknown';
-    }
-
-    /**
-     * Run the standalone yarn binary to execute build.
-     */
-    private function runStandaloneYarnBuild(): void
-    {
-        $os = $this->detectOS();
-
-        if ($os === 'unknown') {
-            error_log('Tailwind Safelist: Unable to detect OS for yarn build');
-            return;
-        }
-
-        $vendorDir = dirname(__DIR__);
         $themeDir = get_stylesheet_directory();
-        $yarnBinary = $vendorDir . '/yarn-' . $os;
 
-        if (!file_exists($yarnBinary)) {
-            error_log('Tailwind Safelist: Yarn binary not found at ' . $yarnBinary);
-            return;
-        }
-
-        // Make executable if needed
-        if (!is_executable($yarnBinary)) {
-            @chmod($yarnBinary, 0755);
-        }
-
+        // Build the WP-CLI command
         $command = sprintf(
-            'cd %s && %s build 2>&1',
+            'cd %s && %s acorn tailwind:build --allow-root 2>&1',
             escapeshellarg($themeDir),
-            escapeshellarg($yarnBinary)
+            escapeshellarg($wpCliPath)
         );
 
         $this->runCommand($command);
+    }
+
+    /**
+     * Get the path to WP-CLI executable.
+     * Uses wp-cli.phar bundled with this package.
+     *
+     * @return string|null Path to wp-cli or null if not found
+     */
+    private function getWpCliPath(): ?string
+    {
+        // Use wp-cli.phar bundled with this package (same directory as yarn binaries)
+        $packageDir = dirname(__DIR__);
+        $wpCliPhar = $packageDir . '/wp-cli.phar';
+
+        if (file_exists($wpCliPhar)) {
+            return 'php ' . $wpCliPhar;
+        }
+
+        // Fallback to wp command in PATH
+        $check = shell_exec('which wp 2>/dev/null');
+        if (!empty(trim($check ?? ''))) {
+            return trim($check);
+        }
+
+        return null;
     }
 
     /**
