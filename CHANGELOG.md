@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.2] - 2026-01-30
+
+### Fixed
+
+- **Suppressed file operation errors in Docker** - Added error suppression (`@`) to `file_put_contents()` and `touch()` calls in `Admin.php` when writing trigger files and touching `tailwind.config.js`. These operations may fail in Docker environments due to permission issues, and the failures are non-critical as the main build process still runs via WP-CLI.
+
 ## [1.0.1] - 2026-01-28
 
 ### Fixed
