@@ -73,17 +73,18 @@ class Admin
      */
     private function triggerBuild(): void
     {
-        $vendorDir = dirname(__DIR__);
         $themeDir = get_stylesheet_directory();
 
         // Write to trigger file (for external watchers if needed)
+        // Suppress errors as this may fail in Docker with permission issues
         $triggerFile = $themeDir . '/.tailwind-build-trigger';
-        file_put_contents($triggerFile, time());
+        @file_put_contents($triggerFile, time());
 
         // Also touch tailwind.config.js for when yarn dev is running
+        // Suppress errors as this may fail with permission issues
         $tailwindConfig = $themeDir . '/tailwind.config.js';
         if (file_exists($tailwindConfig)) {
-            touch($tailwindConfig);
+            @touch($tailwindConfig);
         }
 
         // Try to execute build command if configured
