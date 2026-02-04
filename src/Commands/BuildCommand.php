@@ -31,20 +31,7 @@ class BuildCommand extends Command
             return self::FAILURE;
         }
 
-        if (!is_executable($yarnBinary)) {
-            $this->line('Making yarn binary executable...');
-            @chmod($yarnBinary, 0755);
-
-            // If PHP's chmod failed (e.g., different file owner in Docker), try shell chmod
-            if (!is_executable($yarnBinary)) {
-                @exec(sprintf('chmod +x %s 2>/dev/null', escapeshellarg($yarnBinary)));
-            }
-
-            if (!is_executable($yarnBinary)) {
-                $this->error('Failed to make yarn binary executable. Try running: chmod +x ' . $yarnBinary);
-                return self::FAILURE;
-            }
-        }
+        $yarnBinary = $this->ensureExecutable($yarnBinary, $os);
 
         $buildCommand = $this->option('dev') ? 'dev' : 'build';
         $this->info(sprintf('Running yarn %s in %s...', $buildCommand, $themeDir));
@@ -75,6 +62,47 @@ class BuildCommand extends Command
 
         $this->info(sprintf('Yarn %s completed successfully!', $buildCommand));
         return self::SUCCESS;
+    }
+
+    /**
+     * Ensure the yarn binary is executable.
+     *
+     * Composer strips executable permissions from package files. This method
+     * tries to restore them in-place, and if that fails (e.g., different file
+     * owner in Docker), copies the binary to a temp location where PHP owns it.
+     */
+    private function ensureExecutable(string $yarnBinary, string $os): string
+    {
+        if (is_executable($yarnBinary)) {
+            return $yarnBinary;
+        }
+
+        $this->line('Making yarn binary executable...');
+
+        // Try chmod in-place (PHP native)
+        @chmod($yarnBinary, 0755);
+        if (is_executable($yarnBinary)) {
+            return $yarnBinary;
+        }
+
+        // Try chmod in-place (shell)
+        @exec(sprintf('chmod +x %s 2>/dev/null', escapeshellarg($yarnBinary)));
+        if (is_executable($yarnBinary)) {
+            return $yarnBinary;
+        }
+
+        // Last resort: copy to temp directory where PHP owns the file
+        $this->line('Copying yarn binary to temp directory...');
+        $tempBinary = sys_get_temp_dir() . '/yarn-' . $os;
+        @copy($yarnBinary, $tempBinary);
+        @chmod($tempBinary, 0755);
+
+        if (is_executable($tempBinary)) {
+            return $tempBinary;
+        }
+
+        $this->error('Failed to make yarn binary executable. Try running: chmod +x ' . $yarnBinary);
+        return $yarnBinary;
     }
 
     /**
