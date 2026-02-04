@@ -34,6 +34,16 @@ class BuildCommand extends Command
         if (!is_executable($yarnBinary)) {
             $this->line('Making yarn binary executable...');
             @chmod($yarnBinary, 0755);
+
+            // If PHP's chmod failed (e.g., different file owner in Docker), try shell chmod
+            if (!is_executable($yarnBinary)) {
+                @exec(sprintf('chmod +x %s 2>/dev/null', escapeshellarg($yarnBinary)));
+            }
+
+            if (!is_executable($yarnBinary)) {
+                $this->error('Failed to make yarn binary executable. Try running: chmod +x ' . $yarnBinary);
+                return self::FAILURE;
+            }
         }
 
         $buildCommand = $this->option('dev') ? 'dev' : 'build';

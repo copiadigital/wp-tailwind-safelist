@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **yarn-macos not executable** - Fixed missing executable permission on the `yarn-macos` binary, which would cause build failures on macOS environments.
 
+- **Yarn binary not executable after composer install** - Composer strips executable permissions from package files. Added shell-based `chmod +x` fallback in `BuildCommand.php` when PHP's native `chmod()` fails (e.g., different file ownership in Docker). Now provides a clear error message if both methods fail.
+
 ## [1.0.2] - 2026-01-30
 
 ### Fixed
