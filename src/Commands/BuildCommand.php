@@ -24,7 +24,13 @@ class BuildCommand extends Command
             return self::FAILURE;
         }
 
-        $yarnBinary = $vendorDir . '/yarn-' . $os;
+        $arch = $this->detectArch();
+        $yarnBinary = $vendorDir . '/yarn-' . $os . ($arch ? '-' . $arch : '');
+
+        // Fall back to yarn-{os} if arch-specific binary doesn't exist
+        if (!file_exists($yarnBinary)) {
+            $yarnBinary = $vendorDir . '/yarn-' . $os;
+        }
 
         if (!file_exists($yarnBinary)) {
             $this->error(sprintf('Yarn binary not found at: %s', $yarnBinary));
@@ -122,6 +128,22 @@ class BuildCommand extends Command
         // This is safe because public/build only contains compiled CSS/JS assets
         $command = sprintf('chmod -R a+w %s 2>/dev/null', escapeshellarg($buildDir));
         @exec($command);
+    }
+
+    /**
+     * Detect CPU architecture.
+     *
+     * @return string|null 'arm64' for ARM, null for x64 (default)
+     */
+    private function detectArch(): ?string
+    {
+        $arch = php_uname('m');
+
+        if (in_array($arch, ['aarch64', 'arm64'])) {
+            return 'arm64';
+        }
+
+        return null;
     }
 
     /**
