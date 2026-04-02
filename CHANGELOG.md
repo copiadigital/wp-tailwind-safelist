@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.4] - 2026-04-02
+
+### Added
+
+- **ARM64 (aarch64) support** - Added `yarn-linux-arm64` binary for ARM-based servers (e.g., AWS Graviton EC2 instances). The build command now detects CPU architecture via `php_uname('m')` and selects the appropriate binary, falling back to the x64 binary if no arch-specific binary is found.
+
 ## [1.0.3] - 2026-02-05
 
 ### Fixed
