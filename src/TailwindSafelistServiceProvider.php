@@ -2,6 +2,8 @@
 
 namespace CopiaDigital\TailwindSafelist;
 
+use CopiaDigital\TailwindSafelist\Admin;
+use CopiaDigital\TailwindSafelist\TailwindSafelist;
 use CopiaDigital\TailwindSafelist\Commands\BuildCommand;
 use CopiaDigital\TailwindSafelist\Commands\ScanCommand;
 use CopiaDigital\TailwindSafelist\Commands\UpdateDbCommand;
@@ -44,6 +46,46 @@ class TailwindSafelistServiceProvider extends ServiceProvider
         add_action('init', function () {
             new Admin();
         });
+
+        // Auto-enqueue dynamic.css if the generated file exists.
+        //
+        // NOTE: The Sage layout calls wp_head() BEFORE the `@vite` directive
+        // that prints app.css, so dynamic.css ends up *before* app.css in
+        // the rendered document. That means for equal-specificity utility
+        // class conflicts, the bundle wins. This is intentional — putting
+        // dynamic.css after app.css would break Tailwind's natural
+        // larger-breakpoint-overrides-smaller cascade (because Tailwind
+        // achieves that purely through source order in the generated CSS).
+        //
+        // The right way to handle CMS classes that should override
+        // template defaults is `tailwind-merge` at the template layer:
+        // it strips conflicting classes BEFORE they reach the DOM, so
+        // there's no cascade conflict in the first place.
+        //   composer require gehrisandro/tailwind-merge-laravel
+        $enqueue = function () {
+            $cssPath = TailwindSafelist::getCssOutputPath();
+            if (!file_exists($cssPath)) {
+                return;
+            }
+
+            $themeDir = get_stylesheet_directory();
+            $themeUri = get_stylesheet_directory_uri();
+            if (str_starts_with($cssPath, $themeDir)) {
+                $cssUrl = $themeUri . substr($cssPath, strlen($themeDir));
+            } else {
+                $cssUrl = content_url(str_replace(WP_CONTENT_DIR, '', $cssPath));
+            }
+
+            wp_enqueue_style(
+                'tailwind-safelist-dynamic',
+                $cssUrl,
+                [],
+                (string) filemtime($cssPath)
+            );
+        };
+
+        add_action('wp_enqueue_scripts', $enqueue, 999);
+        add_action('enqueue_block_assets', $enqueue, 999);
 
         // Auto-scan on post save is disabled by default
         // Only enable if explicitly configured AND in development environment

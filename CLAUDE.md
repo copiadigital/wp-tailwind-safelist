@@ -4,199 +4,101 @@ This file provides guidance to Claude Code (claude.ai/claude-code) when working 
 
 ## Project Overview
 
-WP Tailwind Safelist is a WordPress/Acorn package that automatically extracts CSS class names from WordPress content and generates a Tailwind CSS safelist file. This ensures dynamically-added classes (from ACF fields, Gutenberg blocks, etc.) are included in the production CSS build.
+WP Tailwind Safelist is a WordPress/Acorn package that automatically extracts CSS class names from WordPress content (Gutenberg, ACF, CF7, widgets) and generates a `dynamic.css` file directly from them using a **PHP-based Tailwind CSS generator**.
 
-**Key Feature:** Fully self-contained with bundled standalone yarn binaries and WP-CLI - no Node.js required on the server.
+**No Node, no yarn, no shell-out.** The package used to bundle standalone yarn binaries to invoke a real Tailwind build on servers without Node. That approach broke on staging/CI (Ubuntu/glibc mismatches), so it has been replaced with a pure-PHP utility-class compiler.
 
 ## Architecture
 
 ```
 wp-tailwind-safelist/
 ├── src/
-│   ├── Admin.php                    # Admin bar button & AJAX handler (all environments)
-│   ├── Scanner.php                  # Core scanning logic for extracting classes
-│   ├── TailwindSafelist.php         # Main plugin class
-│   ├── TailwindSafelistServiceProvider.php  # Acorn service provider
+│   ├── Admin.php                    # Admin bar button + AJAX handler
+│   ├── Scanner.php                  # Extracts classes from CMS content
+│   ├── CssGenerator.php             # PHP Tailwind → CSS compiler (new)
+│   ├── TailwindSafelist.php         # save_post hook + path helpers
+│   ├── TailwindSafelistServiceProvider.php
 │   └── Commands/
-│       ├── BuildCommand.php         # `wp acorn tailwind:build` command
-│       ├── ScanCommand.php          # `wp acorn tailwind:scan` command
-│       └── UpdateDbCommand.php      # `wp acorn tailwind:update-db` command
-├── config/
-│   └── tailwind-safelist.php        # Default configuration
-├── yarn-linux                       # Standalone yarn binary for Linux (74MB)
-├── yarn-macos                       # Standalone yarn binary for macOS (65MB)
-└── wp-cli.phar                      # Bundled WP-CLI (7MB)
+│       ├── BuildCommand.php         # `wp acorn tailwind:build` — runs the generator
+│       ├── ScanCommand.php          # `wp acorn tailwind:scan`
+│       └── UpdateDbCommand.php      # `wp acorn tailwind:update-db`
+└── config/
+    └── tailwind-safelist.php        # Config + CSS generator theme tokens
 ```
 
 ## Key Components
 
-### Admin.php
-Adds a "Re-process Tailwind" button to the WordPress admin bar. When clicked:
-1. Scans all content via AJAX
-2. Saves classes to database and `tailwind-safelist.txt`
-3. Triggers build via WP-CLI (`php wp-cli.phar acorn tailwind:build`)
+### CssGenerator.php
+Pure PHP Tailwind utility-class compiler. Handles:
+- Class prefix (`tw-` etc.)
+- Negative values (`-mt-20`, `-mt-[20px]`)
+- Arbitrary values (`mb-[1rem]`, `bg-[#ff0000]`, `text-[14px]`)
+- Fractions (`w-1/2`)
+- Alpha syntax (`bg-primary/50` → `color-mix(...)`)
+- Responsive variants (`md:`, `lg:` → `@media`)
+- Pseudo variants (`hover:`, `focus:`, `disabled:`, `file:`, `before:`, …)
+- Spacing/colors/font-sizes/radii driven by config (mirrors `tailwind.config.js`)
 
-**Security:**
-- Available in ALL environments (dev, staging, production)
-- Restricted to administrators only (`manage_options` capability)
-- Protected by nonce verification
+Anything it doesn't recognise is silently skipped — those classes should already be in the main Tailwind build that ships with the theme.
 
 ### Scanner.php
-The core class that extracts CSS classes from:
-- Post content (all post types)
-- ACF fields (flexible content, repeaters, groups, nested fields)
-- ACF Options pages
-- Contact Form 7 forms
-- Widgets
+Unchanged scanning logic. After scanning, `saveClasses()` writes:
+1. `tailwind-safelist.txt` (base64, legacy — kept for local `yarn dev` workflows)
+2. `public/dynamic.css` (the new generated CSS, enqueued in production)
+
+### Admin.php
+The "Re-process Tailwind" admin-bar button now runs everything in-process:
+1. Scan content
+2. Persist classes to DB + safelist file
+3. Generate `dynamic.css` via `CssGenerator`
+
+No more `exec()`, no more `wp-cli.phar`, no more yarn binary detection.
 
 ### BuildCommand.php
-CLI command that:
-1. Detects OS (Linux or macOS)
-2. Locates the appropriate standalone yarn binary
-3. Executes `yarn build` in the theme directory
-
-### TailwindSafelistServiceProvider.php
-Registers the package with Acorn, including commands and configuration.
+`wp acorn tailwind:build` loads the latest classes (DB → falls back to safelist file) and writes `dynamic.css` via `CssGenerator`. Useful for CLI/CI re-builds without re-scanning.
 
 ## CLI Commands
 
 ```bash
-# Scan all content and trigger build
-wp acorn tailwind:scan
-
-# Scan without building
-wp acorn tailwind:scan --no-build
-
-# Build only (uses standalone yarn binary)
-wp acorn tailwind:build
-
-# Development build
-wp acorn tailwind:build --dev
-
-# Create/update the database table
+wp acorn tailwind:scan              # Scan content + write dynamic.css
+wp acorn tailwind:scan --no-build   # Scan only, skip CSS generation step
+wp acorn tailwind:build             # Re-generate dynamic.css from current safelist
 wp acorn tailwind:update-db
-
-# Scan with template files included
-wp acorn tailwind:scan --include-templates
 ```
 
 ## How the Build Process Works
 
 ```
-Admin button click OR `wp acorn tailwind:scan`
+Admin button click  OR  `wp acorn tailwind:scan`
     │
     ▼
-Scanner extracts classes from all content
+Scanner extracts classes from content (posts, ACF, CF7, widgets)
     │
     ▼
-Classes saved to DB and tailwind-safelist.txt
+Classes saved to DB + tailwind-safelist.txt
     │
     ▼
-Admin.php calls: php wp-cli.phar acorn tailwind:build --allow-root
+CssGenerator compiles classes → public/dynamic.css
     │
     ▼
-BuildCommand detects OS via PHP_OS_FAMILY
-    │
-    ▼
-Executes: ./yarn-linux build (or ./yarn-macos build)
-    │
-    ▼
-Tailwind CSS rebuilt with safelist classes
+Theme enqueues dynamic.css alongside the main built CSS
 ```
 
 ## Configuration
 
-The config file (`config/tailwind-safelist.php`) controls:
-- `output_path` - Where to save the safelist file
-- `exclude_patterns` - Regex patterns for classes to ignore
-- `class_field_patterns` - ACF field name patterns that contain CSS classes
-- `build_command` - Custom build command (optional, overrides default)
+`config/tailwind-safelist.php` exposes a `css` block that mirrors the theme's `tailwind.config.js` — `prefix`, `screens`, `spacing`, `colors`, `font_sizes`, `radii`. Whenever the theme adds a new spacing/color token, mirror it here so server-generated styles match.
 
-## Output Format
+## Output
 
-The safelist is saved as a base64-encoded string in `tailwind-safelist.txt`. The theme's `tailwind.config.js` decodes this and adds classes to the safelist array.
+The plugin writes:
+- `public/dynamic.css` — generated CSS, enqueue this on staging/production
+- `tailwind-safelist.txt` — base64 class list, still consumed by local `yarn dev` via `tailwind.config.js`
 
 ## Security Model
 
 | Protection | Implementation |
 |------------|----------------|
-| Authorization | `current_user_can('manage_options')` - Admins only |
-| CSRF | `check_ajax_referer()` - Nonce verification |
-| Command injection | `escapeshellarg()` on all shell arguments |
+| Authorization | `current_user_can('manage_options')` |
+| CSRF | `check_ajax_referer()` |
 
-## Testing Changes
-
-After making changes:
-1. Update the package in a test theme: `composer update copiadigital/wp-tailwind-safelist`
-2. Clear Acorn cache: `wp acorn optimize:clear`
-3. Test the scan: `wp acorn tailwind:scan`
-4. Test the admin bar button (should work in any environment as admin)
-5. Verify build runs successfully
-
-## Environment Support
-
-| Environment | How it works |
-|-------------|--------------|
-| Docker | WP-CLI runs inside PHP container, executes yarn-linux |
-| Local (macOS) | Directly executes yarn-macos |
-| Staging/Production | No Node.js needed - uses bundled yarn-linux |
-
-## Permission Handling
-
-The build process automatically fixes file permissions to prevent `EACCES` errors when builds run from different contexts (PHP container, node container, host machine).
-
-### How it works
-
-Both `Admin.php` and `BuildCommand.php` include a `fixBuildPermissions()` method that:
-
-1. Runs **before** the yarn build to ensure existing files can be deleted/overwritten
-2. Runs **after** the yarn build to ensure new files can be modified by subsequent builds
-
-```php
-private function fixBuildPermissions(string $buildDir): void
-{
-    if (!is_dir($buildDir)) {
-        return;
-    }
-
-    // Make build directory and all contents world-writable
-    // This is safe because public/build only contains compiled CSS/JS assets
-    $command = sprintf('chmod -R a+w %s 2>/dev/null', escapeshellarg($buildDir));
-    @exec($command);
-}
-```
-
-### Why world-writable is safe here
-
-The `public/build` directory only contains:
-- Compiled CSS files
-- Compiled JS files
-- Source maps
-- Build manifest
-
-These are all generated assets with no sensitive data, so world-writable permissions are acceptable.
-
-## Known Issues & Fixes
-
-### WP-CLI Path Escaping (Fixed in v1.1.0)
-
-**Issue:** When `getWpCliPath()` returned `php /path/to/wp-cli.phar`, the entire string was wrapped in `escapeshellarg()`, causing the shell to look for a command literally named `"php /path/to/wp-cli.phar"`.
-
-**Fix:** The phar path is now escaped separately:
-```php
-// Before (broken):
-return 'php ' . $wpCliPhar;
-// ... then later:
-escapeshellarg($wpCliPath) // Wraps entire string = broken
-
-// After (fixed):
-return 'php ' . escapeshellarg($wpCliPhar);
-// ... then later:
-$wpCliPath // Already properly escaped
-```
-
-### Permission Errors in Docker (Fixed in v1.1.0)
-
-**Issue:** When the PHP container ran `yarn build`, files were created as `root`. Subsequent builds from different users/containers failed with `EACCES: permission denied`.
-
-**Fix:** Added `fixBuildPermissions()` that runs `chmod -R a+w` on the build directory before and after builds.
+Note: there is no longer any `exec()` / shell-out, so command injection is no longer a concern.

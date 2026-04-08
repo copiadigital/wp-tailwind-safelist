@@ -270,10 +270,16 @@ class TailwindSafelist
 
     private function buildAssets(array $classes): void
     {
-        $classes_base64 = base64_encode(implode(' ', $classes));
-        $file_path = $this->getOutputPath();
+        // Regenerate dynamic.css via the PHP generator.
+        $generator = new CssGenerator(self::getCssConfig());
+        $css = $generator->generate($classes);
 
-        file_put_contents($file_path, $classes_base64);
+        $cssPath = self::getCssOutputPath();
+        $dir = dirname($cssPath);
+        if (!is_dir($dir)) {
+            @mkdir($dir, 0755, true);
+        }
+        file_put_contents($cssPath, $css);
     }
 
     /**
@@ -286,10 +292,72 @@ class TailwindSafelist
     }
 
     /**
-     * Get the output file path.
+     * Get the output file path for the generated dynamic CSS.
      */
-    public static function getOutputPath(): string
+    public static function getCssOutputPath(): string
     {
-        return config('tailwind-safelist.output_path', get_stylesheet_directory() . '/tailwind-safelist.txt');
+        return config('tailwind-safelist.css_output_path', get_stylesheet_directory() . '/public/dynamic.css');
+    }
+
+    /**
+     * Build the merged config passed to the CssGenerator.
+     *
+     * Resolution order (later overrides earlier):
+     *   1. Tokens parsed from the theme's tailwind.config.js
+     *   2. The `css` block in config/tailwind-safelist.php
+     *
+     * This way `tailwind.config.js` is the single source of truth for
+     * design tokens — adding `col-13: '120%'` there is enough for the
+     * "Re-process Tailwind" button to start emitting `tw-w-col-13`.
+     */
+    public static function getCssConfig(): array
+    {
+        $php = (array) config('tailwind-safelist.css', []);
+
+        $jsPath = config(
+            'tailwind-safelist.tailwind_config_path',
+            get_stylesheet_directory() . '/tailwind.config.js'
+        );
+
+        $parsed = TailwindConfigParser::parse((string) $jsPath);
+
+        $merged = array_replace_recursive($parsed, $php);
+
+        // Build an exclude set of classes already known to the static
+        // codebase, so that dynamic.css only contains the *additional*
+        // classes that came from CMS content.
+        //
+        // Source-file scanning is the source of truth (works in both
+        // `yarn dev` and `yarn build`); compiled-bundle scanning is a
+        // useful supplement that picks up safelist classes too.
+        if (config('tailwind-safelist.dedupe_against_bundle', true)) {
+            $exclude = [];
+
+            // 1. Compiled bundle (may be stale in `yarn dev`)
+            $manifestPath = config(
+                'tailwind-safelist.manifest_path',
+                get_stylesheet_directory() . '/public/build/manifest.json'
+            );
+            $exclude = BundleClassIndex::build((string) $manifestPath);
+
+            // 2. Live template/source scan
+            $themeDir = get_stylesheet_directory();
+            $templatePaths = config('tailwind-safelist.template_paths', [
+                $themeDir . '/resources',
+                $themeDir . '/app',
+                $themeDir . '/modules',
+            ]);
+            $extensions = config('tailwind-safelist.template_extensions', [
+                'php', 'js', 'html', 'scss', 'css',
+            ]);
+            $exclude += BundleClassIndex::buildFromTemplates(
+                (array) $templatePaths,
+                (array) $extensions
+            );
+
+            $merged['exclude_classes'] = $exclude;
+        }
+
+        return $merged;
     }
 }

@@ -11,7 +11,7 @@ class ScanCommand extends Command
     protected $signature = 'tailwind:scan
                             {--post-types=* : Specific post types to scan}
                             {--include-templates : Include scanning Blade templates (skipped by default)}
-                            {--no-build : Skip the yarn build step after scanning}';
+                            {--no-build : Skip the dynamic.css generation step after scanning}';
 
     protected $description = 'Scan all content (posts, pages, CF7 forms, ACF fields, etc.) and rebuild the Tailwind safelist.';
 
@@ -106,12 +106,13 @@ class ScanCommand extends Command
         $scanner->saveClasses($allClasses);
 
         $this->info(sprintf('Found %d unique classes.', count($allClasses)));
-        $this->info('Safelist saved to ' . basename(TailwindSafelist::getOutputPath()));
+        $this->info('CSS written to ' . basename(TailwindSafelist::getCssOutputPath()));
 
-        // Trigger yarn build unless skipped
+        // Generate dynamic.css unless skipped (Scanner::saveClasses already wrote it,
+        // but we re-run the command so its info output appears in the CLI log).
         if (!$this->option('no-build')) {
             $this->line('');
-            $this->info('Triggering yarn build...');
+            $this->info('Generating dynamic.css...');
             $this->call('tailwind:build');
         }
 

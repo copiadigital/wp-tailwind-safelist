@@ -8,7 +8,7 @@ return [
     |--------------------------------------------------------------------------
     |
     | When enabled, automatically scans content when posts are saved.
-    | Disabled by default - use the admin bar button or CLI command instead.
+    | Disabled by default — use the admin bar button or CLI command instead.
     |
     */
 
@@ -16,33 +16,71 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Output Path
+    | CSS Output Path
     |--------------------------------------------------------------------------
     |
-    | The path where the safelist file will be saved. This file contains
-    | base64-encoded class names that should be read by your Tailwind config.
+    | The generated dynamic CSS file. The plugin auto-enqueues this on the
+    | frontend when it exists.
     |
     */
 
-    'output_path' => get_stylesheet_directory() . '/tailwind-safelist.txt',
+    'css_output_path' => get_stylesheet_directory() . '/public/dynamic.css',
+
+    /*
+    |--------------------------------------------------------------------------
+    | Tailwind Config Path
+    |--------------------------------------------------------------------------
+    |
+    | Path to the theme's tailwind.config.js. The plugin parses this file
+    | for design tokens (prefix, screens, spacing, colors, fontSize,
+    | borderRadius, width) so that adding a token in tailwind.config.js
+    | is enough — no need to mirror it here.
+    |
+    */
+
+    'tailwind_config_path' => get_stylesheet_directory() . '/tailwind.config.js',
+
+    /*
+    |--------------------------------------------------------------------------
+    | Bundle Dedup
+    |--------------------------------------------------------------------------
+    |
+    | When `dedupe_against_bundle` is true, the plugin reads the Vite
+    | manifest, extracts every class selector already present in the
+    | compiled CSS bundle, and skips those classes when generating
+    | dynamic.css. This keeps dynamic.css limited to the classes that
+    | came from CMS content and weren't already in the main build.
+    |
+    */
+
+    'dedupe_against_bundle' => true,
+    'manifest_path' => get_stylesheet_directory() . '/public/build/manifest.json',
+
+    /*
+    | Source directories scanned for class names. Acts as the source of
+    | truth for "what's already in the main build" — works in both
+    | `yarn dev` (where the on-disk bundle is stale) and `yarn build`.
+    */
+    'template_paths' => [
+        get_stylesheet_directory() . '/resources',
+        get_stylesheet_directory() . '/app',
+        get_stylesheet_directory() . '/modules',
+    ],
+    'template_extensions' => ['php', 'js', 'html', 'scss', 'css'],
 
     /*
     |--------------------------------------------------------------------------
     | Exclude Patterns
     |--------------------------------------------------------------------------
-    |
-    | Regular expression patterns for classes to exclude from the safelist.
-    | WordPress and plugin-specific classes that aren't Tailwind classes.
-    |
     */
 
     'exclude_patterns' => [
-        '/^wp-/',           // WordPress classes
-        '/^wpcf7/',         // Contact Form 7 classes
-        '/^acf-/',          // ACF classes
-        '/^block-/',        // Block editor classes
-        '/^is-/',           // State classes
-        '/^has-/',          // Has-* classes (unless you use them in Tailwind)
+        '/^wp-/',
+        '/^wpcf7/',
+        '/^acf-/',
+        '/^block-/',
+        '/^is-/',
+        '/^has-/',
         '/^alignwide$/',
         '/^alignfull$/',
         '/^alignleft$/',
@@ -52,82 +90,39 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Class Field Patterns
+    | Class Field Patterns (ACF)
     |--------------------------------------------------------------------------
-    |
-    | Field name patterns that indicate the field contains CSS class names.
-    | When scanning ACF fields, if a field name contains any of these patterns,
-    | the entire field value will be treated as class names.
-    |
     */
 
     'class_field_patterns' => [
-        'class',
-        'classes',
-        'className',
-        'css_class',
-        'css_classes',
-        'custom_class',
-        'additional_class',
-        'wrapper_class',
-        'container_class',
-        'section_class',
-        'style',
-        'styles',
-        'tailwind',
+        'class', 'classes', 'className',
+        'css_class', 'css_classes', 'custom_class',
+        'additional_class', 'wrapper_class', 'container_class',
+        'section_class', 'style', 'styles', 'tailwind',
     ],
 
     /*
     |--------------------------------------------------------------------------
-    | Build Command (Development Only)
+    | CSS Generator Overrides
     |--------------------------------------------------------------------------
     |
-    | Shell command to run after updating the safelist. This is executed
-    | directly when clicking the admin bar button.
+    | Tokens defined here override / supplement what is parsed from
+    | tailwind.config.js. Leave empty unless you need to add tokens that
+    | aren't expressible in tailwind.config.js (e.g. extra pseudo
+    | variants) or you want to override individual values.
     |
-    | For Docker environments, use the docker exec command:
-    | 'docker exec wp_base-node-1 yarn build'
-    |
-    | For local development without Docker:
-    | 'cd ' . get_stylesheet_directory() . ' && yarn build'
-    |
-    | Set to null to disable automatic builds.
+    | Shape:
+    |   'css' => [
+    |       'prefix'      => 'tw-',
+    |       'screens'     => [...],
+    |       'spacing'     => [...],
+    |       'colors'      => [...],
+    |       'font_sizes'  => [...],
+    |       'radii'       => [...],
+    |   ],
     |
     */
 
-    'build_command' => null,
-
-    /*
-    |--------------------------------------------------------------------------
-    | Build Trigger File (Development Only)
-    |--------------------------------------------------------------------------
-    |
-    | Alternative to build_command. Path to a file that will be touched when
-    | the safelist is updated. A file watcher can monitor this to trigger builds.
-    | Only used if build_command is null.
-    |
-    | Example watcher command:
-    | while inotifywait -e modify /path/to/.tailwind-build-trigger; do yarn build; done
-    |
-    */
-
-    'build_trigger_file' => null,
-
-    /*
-    |--------------------------------------------------------------------------
-    | Node Container Name (Docker Development)
-    |--------------------------------------------------------------------------
-    |
-    | The Docker container name running Node.js. Used for auto-detection
-    | of the build environment when build_command is not set.
-    |
-    | If not set, will auto-detect by looking for containers with names
-    | ending in "-node-1" (docker compose naming convention).
-    |
-    | Example: 'wp_mysite-node-1'
-    |
-    */
-
-    'node_container' => null,
+    'css' => [],
 
 ];

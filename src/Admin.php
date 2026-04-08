@@ -51,152 +51,17 @@ class Admin
             $scanner = new Scanner();
             $classes = $scanner->scanAll();
 
-            // Save to database and file
+            // Save to database and file (also writes dynamic.css)
             $scanner->saveClasses($classes);
 
-            // Trigger build via watcher file
-            $this->triggerBuild();
-
             wp_send_json_success([
-                'message' => sprintf('Found %d unique classes. Safelist updated. Build triggered.', count($classes)),
+                'message' => sprintf('Found %d unique classes. dynamic.css regenerated.', count($classes)),
                 'classes_count' => count($classes),
             ]);
         } catch (\Throwable $e) {
             wp_send_json_error([
                 'message' => 'Error: ' . $e->getMessage(),
             ], 500);
-        }
-    }
-
-    /**
-     * Trigger yarn build via watcher file.
-     */
-    private function triggerBuild(): void
-    {
-        $themeDir = get_stylesheet_directory();
-
-        // Write to trigger file (for external watchers if needed)
-        // Suppress errors as this may fail in Docker with permission issues
-        $triggerFile = $themeDir . '/.tailwind-build-trigger';
-        @file_put_contents($triggerFile, time());
-
-        // Also touch tailwind.config.js for when yarn dev is running
-        // Suppress errors as this may fail with permission issues
-        $tailwindConfig = $themeDir . '/tailwind.config.js';
-        if (file_exists($tailwindConfig)) {
-            @touch($tailwindConfig);
-        }
-
-        // Try to execute build command if configured
-        $this->executeYarnBuild();
-    }
-
-    /**
-     * Execute yarn build via WP-CLI.
-     *
-     * Uses `wp acorn tailwind:build` which handles OS detection
-     * and runs the appropriate standalone yarn binary.
-     */
-    private function executeYarnBuild(): void
-    {
-        // Check for custom build command first
-        $buildCommand = config('tailwind-safelist.build_command');
-
-        if (!empty($buildCommand)) {
-            $this->runCommand($buildCommand);
-            return;
-        }
-
-        // Use WP-CLI to run the build command
-        $wpCliPath = $this->getWpCliPath();
-
-        if (!$wpCliPath) {
-            error_log('Tailwind Safelist: WP-CLI not found, relying on trigger file');
-            return;
-        }
-
-        $themeDir = get_stylesheet_directory();
-        $buildDir = $themeDir . '/public/build';
-
-        // Fix permissions before build to avoid EACCES errors
-        // This handles cases where files were created by different users (root vs www-data)
-        $this->fixBuildPermissions($buildDir);
-
-        // Build the WP-CLI command
-        // Note: $wpCliPath is already shell-escaped by getWpCliPath()
-        $command = sprintf(
-            'cd %s && %s acorn tailwind:build --allow-root 2>&1',
-            escapeshellarg($themeDir),
-            $wpCliPath
-        );
-
-        $this->runCommand($command);
-
-        // Fix permissions after build so subsequent builds can overwrite
-        $this->fixBuildPermissions($buildDir);
-    }
-
-    /**
-     * Fix permissions on the build directory to avoid EACCES errors.
-     *
-     * When builds run from different contexts (PHP container, node container, host),
-     * files may be owned by different users. This makes the build directory
-     * world-writable since it only contains compiled assets (not sensitive data).
-     */
-    private function fixBuildPermissions(string $buildDir): void
-    {
-        if (!is_dir($buildDir)) {
-            return;
-        }
-
-        // Make build directory and all contents world-writable
-        // This is safe because public/build only contains compiled CSS/JS assets
-        $command = sprintf('chmod -R a+w %s 2>/dev/null', escapeshellarg($buildDir));
-        @exec($command);
-    }
-
-    /**
-     * Get the path to WP-CLI executable.
-     * Uses wp-cli.phar bundled with this package.
-     *
-     * Returns a shell-safe command string that can be used directly in shell commands.
-     * The path component is properly escaped with escapeshellarg().
-     *
-     * @return string|null Shell-safe WP-CLI command or null if not found
-     */
-    private function getWpCliPath(): ?string
-    {
-        // Use wp-cli.phar bundled with this package (same directory as yarn binaries)
-        $packageDir = dirname(__DIR__);
-        $wpCliPhar = $packageDir . '/wp-cli.phar';
-
-        if (file_exists($wpCliPhar)) {
-            // Return with php command and properly escaped phar path
-            return 'php ' . escapeshellarg($wpCliPhar);
-        }
-
-        // Fallback to wp command in PATH
-        $check = shell_exec('which wp 2>/dev/null');
-        if (!empty(trim($check ?? ''))) {
-            return escapeshellarg(trim($check));
-        }
-
-        return null;
-    }
-
-    /**
-     * Run a shell command and log the result.
-     */
-    private function runCommand(string $command): void
-    {
-        $output = [];
-        $returnCode = 0;
-        exec($command, $output, $returnCode);
-
-        if ($returnCode !== 0) {
-            error_log('Tailwind Safelist: Build failed with code ' . $returnCode . ': ' . implode("\n", $output));
-        } else {
-            error_log('Tailwind Safelist: Build completed successfully');
         }
     }
 
